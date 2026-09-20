@@ -1,0 +1,11 @@
+{
+  "name": "elevo",
+  "version": "1.0.0",
+  "description": "ELEVO — Your Skills. Real Opportunities. Full-stack prototype (zero dependencies).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=14" },
+  "license": "MIT"
+}
