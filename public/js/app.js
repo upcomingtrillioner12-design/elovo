@@ -1,34 +1,42 @@
-/* ELEVO — Frontend SPA (vanilla JS, hash routing) */
+/* ELEVO — Frontend SPA (responsive: Android bottom-nav / desktop top-nav) */
 (function () {
   'use strict';
 
-  const app = document.getElementById('app');
-  const toastEl = document.getElementById('toast');
-  const topbar = document.getElementById('topbar');
-  const navGoal = document.getElementById('nav-goal');
+  var app = document.getElementById('app');
+  var toastEl = document.getElementById('toast');
+  var topbar = document.getElementById('topbar');
+  var bottombar = document.getElementById('bottombar');
+  var fab = document.getElementById('mentor-fab');
+  var sheet = document.getElementById('more-sheet');
+  var backdrop = document.getElementById('sheet-backdrop');
 
   /* ---------- helpers ---------- */
-  const esc = s => String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-  async function api(path, opts) {
-    const r = await fetch(path, {
-      headers: { 'Content-Type': 'application/json' },
-      ...opts,
-      body: opts && opts.body ? JSON.stringify(opts.body) : undefined
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || ('Request failed (' + r.status + ')'));
-    return d;
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  let toastTimer = null;
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(path, {
+      method: opts.method || 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.error || ('Request failed (' + r.status + ')'));
+        return d;
+      });
+    });
+  }
+
+  var toastTimer = null;
   function toast(msg) {
     toastEl.textContent = msg;
     toastEl.classList.remove('hidden');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 2600);
+    toastTimer = setTimeout(function () { toastEl.classList.add('hidden'); }, 2800);
   }
 
   function pageHead(kicker, title, sub) {
@@ -38,566 +46,704 @@
   }
 
   function progressBar(pct, label) {
-    return '<div class="progress" role="progressbar" aria-valuenow="' + pct + '"><div style="width:' + pct + '%"></div></div>' +
-      (label ? '<span class="skill-pct">' + esc(label) + '</span>' : '');
+    return '<div class="progress"><div style="width:' + pct + '%"></div></div>' +
+      (label ? '<span class="badge-done" style="background:var(--paper);color:var(--ink);border:1.5px solid var(--ink)">' + esc(label) + '</span>' : '');
   }
 
-  function btn(id, text, cls) {
-    return '<button id="' + id + '" class="btn ' + (cls || '') + '">' + esc(text) + '</button>';
+  function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+
+  function closeSheet() { sheet.classList.add('hidden'); backdrop.classList.add('hidden'); }
+  backdrop.addEventListener('click', closeSheet);
+  sheet.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeSheet); });
+
+  function route() { return (location.hash.replace(/^#\/?/, '') || 'welcome').split('?')[0]; }
+
+  /* ---------- shell ---------- */
+  function syncShell() {
+    return api('/api/settings').then(function (s) {
+      var name = s.profile && s.profile.name;
+      var hasGoal = null;
+      return api('/api/goal').then(function (g) {
+        hasGoal = !!g.goal;
+        var publicRoute = ['welcome', 'goal', 'menu'].indexOf(route()) !== -1;
+        topbar.classList.toggle('hidden', !hasGoal || publicRoute);
+        bottombar.classList.toggle('hidden', !hasGoal || publicRoute);
+        fab.classList.toggle('hidden', !hasGoal || route() === 'mentor' || publicRoute);
+        document.querySelectorAll('[data-nav]').forEach(function (a) {
+          a.classList.toggle('active', route().indexOf(a.getAttribute('data-nav')) === 0);
+        });
+        return { name: name, hasGoal: hasGoal };
+      });
+    }).catch(function () { return { name: '', hasGoal: false }; });
   }
 
-  function on(id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
-
-  /* ---------- nav / shell ---------- */
-  async function syncShell() {
-    let goal = null, career = null;
-    try { const g = await api('/api/goal'); goal = g.goal; career = g.career; } catch (e) {}
-    const publicRoute = ['welcome', 'goal'].includes(currentRoute());
-    topbar.classList.toggle('hidden', !goal || publicRoute);
-    navGoal.textContent = career ? career.name : '';
-    document.querySelectorAll('[data-nav]').forEach(a => {
-      a.classList.toggle('active', currentRoute().startsWith(a.dataset.nav));
-    });
-  }
-
-  function currentRoute() {
-    return (location.hash.replace(/^#\/?/, '') || 'welcome').split('?')[0];
-  }
-
-  /* ================= SCREEN 1: WELCOME ================= */
-  async function renderWelcome() {
+  /* ================= WELCOME ================= */
+  function renderWelcome() {
     app.innerHTML =
       '<section class="welcome">' +
         '<div class="welcome-logo">ELEVO<span>.</span></div>' +
         '<div class="welcome-tag">Your Skills. Real Opportunities.</div>' +
-        '<p class="welcome-sub">Bridging the gap between skills and opportunities. One journey: pick a goal, learn, practice, build your portfolio, connect and land real opportunities.</p>' +
+        '<p class="welcome-sub">Bridging the gap between skills and opportunities. GOAL &#8594; LEARN &#8594; PRACTICE &#8594; BUILD &#8594; CONNECT &#8594; OPPORTUNITY - all in one place.</p>' +
         '<div class="journey-strip">' +
-          '<span>Goal</span><i>&rarr;</i><span>Learn</span><i>&rarr;</i><span>Practice</span><i>&rarr;</i><span>Build</span><i>&rarr;</i><span>Connect</span><i>&rarr;</i><span>Opportunity</span>' +
+          '<span>Goal</span><i>&#8594;</i><span>Learn</span><i>&#8594;</i><span>Practice</span><i>&#8594;</i><span>Build</span><i>&#8594;</i><span>Connect</span><i>&#8594;</i><span>Opportunity</span>' +
         '</div>' +
-        '<div class="welcome-cta">' +
-          '<a class="btn btn-solid" href="#/goal">Get Started</a>' +
-          '<a class="btn" href="#/mentor">Ask AI Mentor</a>' +
-        '</div>' +
+        '<form class="name-form" id="name-form">' +
+          '<input class="search-input" id="name-input" type="text" maxlength="30" placeholder="Your first name (optional)">' +
+          '<button class="btn btn-solid" type="submit">Get Started &#8594;</button>' +
+        '</form>' +
       '</section>';
-    await syncShell();
-  }
-
-  /* ================= SCREEN 2: CHOOSE GOAL ================= */
-  async function renderGoal() {
-    app.innerHTML = pageHead('Step 1 of your journey', 'Choose Your Goal', 'Pick the career you want to build toward. Your entire roadmap, practice projects and opportunities will be personalized to this goal.');
-    const box = document.createElement('div');
-    box.innerHTML =
-      '<div class="filter-row"><input id="goal-search" class="search-input" type="text" placeholder="Search careers... (press Enter to explore more)">' +
-      '<button id="explore-more" class="btn btn-small">Explore More</button></div>' +
-      '<div id="goal-grid" class="grid grid-2"></div>';
-    app.appendChild(box);
-
-    const data = await api('/api/careers');
-    const grid = document.getElementById('goal-grid');
-
-    function draw(list) {
-      grid.innerHTML = list.map(c =>
-        '<div class="card clickable" data-career="' + esc(c.id) + '">' +
-          '<div class="card-title">' + esc(c.name) + '</div>' +
-          '<div class="card-text">' + esc(c.tagline) + '</div>' +
-          '<div><span class="tag">' + c.skillCount + ' skills</span> <span class="tag">' + c.projectCount + ' projects</span></div>' +
-          '<div class="card-foot"><button class="btn btn-small btn-solid" data-pick="' + esc(c.id) + '">Select Goal</button></div>' +
-        '</div>'
-      ).join('') || '<div class="empty">No careers match your search</div>';
-
-      grid.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async e => {
-        e.stopPropagation();
-        b.disabled = true;
-        try {
-          await api('/api/goal', { method: 'POST', body: { careerId: b.dataset.pick } });
-          toast('Goal saved: ' + b.dataset.pick.replace(/-/g, ' '));
-          location.hash = '#/roadmap';
-        } catch (err) { toast(err.message); b.disabled = false; }
-      }));
-      grid.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => {
-        const b = c.querySelector('[data-pick]'); if (b) b.click();
-      }));
-    }
-    draw(data);
-
-    const search = document.getElementById('goal-search');
-    search.addEventListener('input', () => {
-      const q = search.value.trim().toLowerCase();
-      draw(data.filter(c => (c.name + ' ' + c.tagline).toLowerCase().includes(q)));
+    document.getElementById('name-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('name-input').value.trim();
+      var go = function () { location.hash = '#/goal'; };
+      if (name) api('/api/settings', { method: 'POST', body: { name: name } }).then(go, go);
+      else go();
     });
-    on('explore-more', () => { search.focus(); toast('Type to search and explore all career paths'); });
-    await syncShell();
+    syncShell();
   }
 
-  /* ================= SCREEN 3: ROADMAP ================= */
-  async function renderRoadmap() {
-    app.innerHTML = pageHead('Step 2 — Your personalized path', 'Your Roadmap', '');
-    let data;
-    try { data = await api('/api/progress'); }
-    catch (e) { app.innerHTML += '<div class="empty">' + esc(e.message) + ' <a href="#/goal">Choose a goal</a></div>'; return syncShell(); }
+  /* ================= GOAL ================= */
+  function renderGoal() {
+    app.innerHTML = pageHead('Step 1 of your journey', 'Choose Your Goal', 'What do you want to become? Your roadmap, projects and opportunities will be personalized to this goal.') +
+      '<div style="margin-bottom:16px"><input id="goal-search" class="search-input" type="text" placeholder="Search your dream..."></div>' +
+      '<div id="goal-list"></div>';
 
-    const phaseOrder = ['GOAL', 'LEARN', 'PRACTICE', 'BUILD', 'CONNECT', 'OPPORTUNITY'];
-    const currentPhase = data.nextStep ? data.nextStep.phase : 'OPPORTUNITY';
+    api('/api/careers').then(function (data) {
+      var list = document.getElementById('goal-list');
+      function draw(items) {
+        list.innerHTML = items.map(function (c) {
+          var letter = c.name.charAt(0);
+          return '<div class="row-item" data-pick="' + esc(c.id) + '">' +
+            '<div class="row-ico">' + esc(letter) + '</div>' +
+            '<div class="row-main"><div class="row-title">' + esc(c.name) + '</div>' +
+            '<div class="row-sub">' + esc(c.tagline) + ' &middot; ' + c.skillCount + ' skills &middot; ' + c.projectCount + ' projects</div></div>' +
+            '<div class="row-arrow">&#8594;</div></div>';
+        }).join('') || '<div class="empty">No careers match your search</div>';
+        list.querySelectorAll('[data-pick]').forEach(function (el) {
+          el.addEventListener('click', function () {
+            el.style.opacity = '.5';
+            api('/api/goal', { method: 'POST', body: { careerId: el.getAttribute('data-pick') } })
+              .then(function () { toast('Goal saved'); location.hash = '#/roadmap'; })
+              .catch(function (e) { toast(e.message); el.style.opacity = '1'; });
+          });
+        });
+      }
+      draw(data);
+      document.getElementById('goal-search').addEventListener('input', function () {
+        var q = this.value.trim().toLowerCase();
+        draw(data.filter(function (c) { return (c.name + ' ' + c.tagline).toLowerCase().indexOf(q) !== -1; }));
+      });
+    });
+    syncShell();
+  }
 
-    let html = '<div class="roadmap-flow">' + phaseOrder.map(p =>
-      '<span class="' + (p === currentPhase ? 'current' : '') + '">' + p + '</span>'
-    ).join('<i>&rarr;</i>') + '</div>';
+  /* ================= HOME / DASHBOARD ================= */
+  function renderHome() {
+    api('/api/dashboard').catch(function (e) {
+      app.innerHTML = pageHead('ELEVO', 'Start your journey', '') + '<div class="empty">' + esc(e.message) + '</div><div style="margin-top:16px"><a class="btn btn-solid" href="#/goal">Choose Your Goal</a></div>';
+      syncShell();
+    }).then(function (d) {
+      if (!d || !d.career) return;
+      syncShell().then(function (sh) {
+        var first = (sh.name || 'Learner').split(' ')[0];
+        var pct = d.totalSkills ? Math.round(d.skillsDone / d.totalSkills * 100) : 0;
+        var nextSkill = d.skills.filter(function (s) { return !s.complete; })[0];
+        var continueTopic = null;
+        if (nextSkill) continueTopic = nextSkill.topics.filter(function (t) { return !t.done; })[0];
 
-    if (data.nextStep) {
-      html += '<div class="next-step-bar"><strong>Recommended next step</strong><span>' + esc(data.nextStep.label) + '</span>' +
-        (data.nextStep.phase === 'LEARN'
-          ? '<a class="btn btn-small btn-solid" href="#/learn">Start Learning</a>'
-          : data.nextStep.phase === 'PRACTICE'
-            ? '<a class="btn btn-small btn-solid" href="#/practice">Start Project</a>'
+        app.innerHTML = pageHead('Home / Dashboard', 'Hi ' + esc(first) + ' &#128075;', 'Small steps. Big dreams. Here is your journey at a glance.') +
+
+          '<div class="roadmap-flow" style="margin-bottom:18px">' +
+            ['GOAL', 'LEARN', 'PRACTICE', 'BUILD', 'CONNECT', 'OPPORTUNITY'].map(function (p) {
+              var cur = d.nextStep && d.nextStep.phase === p;
+              return '<span class="' + (cur ? 'current' : '') + '">' + p + '</span>';
+            }).join('<i>&#8594;</i>') + '</div>' +
+
+          '<div class="grid grid-4" style="margin-bottom:18px">' +
+            '<div class="stat"><div class="stat-num">' + d.skillsDone + '<span style="font-size:18px;color:var(--grey)">/' + d.totalSkills + '</span></div><div class="stat-label">Skills Done</div></div>' +
+            '<div class="stat"><div class="stat-num">' + d.projectsDone + '<span style="font-size:18px;color:var(--grey)">/' + d.totalProjects + '</span></div><div class="stat-label">Projects Done</div></div>' +
+            '<div class="stat"><div class="stat-num">' + d.portfolio.length + '</div><div class="stat-label">Portfolio Items</div></div>' +
+            '<div class="stat"><div class="stat-num">' + d.certificates.length + '</div><div class="stat-label">Certificates</div></div>' +
+          '</div>' +
+
+          (continueTopic ?
+            '<div class="card" style="margin-bottom:14px"><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag tag-fill">Continue Learning</span>' +
+            (nextSkill.complete ? '' : '<span class="badge-done">' + nextSkill.pct + '%</span>') + '</div>' +
+            '<div class="card-title">' + esc(continueTopic.title) + '</div>' +
+            '<div class="card-text">' + esc(nextSkill.skill.name) + ' &middot; ' + esc(continueTopic.resource.label) + '</div>' +
+            '<div class="card-foot"><a class="btn btn-small btn-solid" href="#/learn">Resume &#8594;</a></div></div>' : '') +
+
+          '<div class="next-step-bar"><strong>&#10022; Your next step</strong><span>' + esc(d.nextStep ? d.nextStep.label : 'Apply to opportunities and connect with mentors') + '</span>' +
+          '<a class="btn btn-small btn-solid" href="' + (d.nextStep && d.nextStep.phase === 'LEARN' ? '#/learn' : d.nextStep && d.nextStep.phase === 'PRACTICE' ? '#/practice' : '#/opportunities') + '">Go &#8594;</a></div>' +
+
+          '<h2 class="card-title" style="margin-bottom:12px">Skill Progress (' + pct + '%)</h2>' +
+          d.skills.map(function (s) {
+            return '<div class="skill-row" style="margin-bottom:10px"><div class="skill-head" style="cursor:default">' +
+              '<span class="skill-name">' + esc(s.skill.name) + '</span>' +
+              progressBar(s.pct, s.done + '/' + s.total) +
+              (s.complete ? '<span class="badge-done">Done</span>' : '') + '</div></div>';
+          }).join('') +
+
+          '<h2 class="card-title" style="margin:24px 0 12px">Recent Portfolio</h2>' +
+          (d.portfolio.length ? '<div class="grid grid-3">' + d.portfolio.slice(-3).reverse().map(function (i) {
+            return '<div class="card"><div class="card-title" style="font-size:14px">' + esc(i.title) + '</div><div class="card-text">' + esc(i.date) + '</div></div>';
+          }).join('') + '</div>' : '<div class="empty">No portfolio items yet - complete a practice project</div>') +
+
+          '<div style="margin-top:26px;display:flex;gap:8px;flex-wrap:wrap">' +
+            '<a class="btn btn-solid" href="#/learn">Continue Learning</a>' +
+            '<a class="btn" href="#/practice">Practice</a>' +
+            '<a class="btn" href="#/opportunities">Opportunities</a>' +
+          '</div>';
+      });
+    });
+  }
+
+  /* ================= ROADMAP ================= */
+  function renderRoadmap() {
+    api('/api/progress').then(function (data) {
+      var phaseOrder = ['GOAL', 'LEARN', 'PRACTICE', 'BUILD', 'CONNECT', 'OPPORTUNITY'];
+      var currentPhase = data.nextStep ? data.nextStep.phase : 'OPPORTUNITY';
+      var html = pageHead('Step 2 - Your personalized path', 'Your Roadmap', 'Goal: ' + data.career.name) +
+        '<div class="roadmap-flow">' + phaseOrder.map(function (p) {
+          return '<span class="' + (p === currentPhase ? 'current' : '') + '">' + p + '</span>';
+        }).join('<i>&#8594;</i>') + '</div>';
+
+      if (data.nextStep) {
+        html += '<div class="next-step-bar"><strong>&#10022; Recommended next step</strong><span>' + esc(data.nextStep.label) + '</span>' +
+          (data.nextStep.phase === 'LEARN' ? '<a class="btn btn-small btn-solid" href="#/learn">Start Learning</a>'
+            : data.nextStep.phase === 'PRACTICE' ? '<a class="btn btn-small btn-solid" href="#/practice">Start Project</a>'
             : '<a class="btn btn-small btn-solid" href="#/connect">Connect</a>') + '</div>';
-    }
+      }
 
-    html += data.skills.map((s, i) =>
-      '<div class="skill-row" data-skill="' + esc(s.skill.id) + '">' +
-        '<div class="skill-row-head">' +
-          '<span class="skill-num">' + String(i + 1).padStart(2, '0') + '</span>' +
+      html += data.skills.map(function (s, i) {
+        return '<div class="skill-row" data-skill="' + esc(s.skill.id) + '">' +
+          '<div class="skill-head"><span class="skill-num">' + ('0' + (i + 1)).slice(-2) + '</span>' +
           '<span class="skill-name">' + esc(s.skill.name) + '</span>' +
-          progressBar(s.pct, s.done + '/' + s.total + ' topics') +
-          (s.complete ? '<span class="badge-done">Done</span>' : '') +
-        '</div>' +
-        '<div class="skill-body">' +
-          '<p class="card-text" style="margin-bottom:12px;">' + s.total + ' topics in this skill. Complete all topics to master it.</p>' +
-          s.topics.map(t =>
-            '<div class="topic" style="opacity:.75"><div class="topic-top"><span class="topic-title">' + esc(t.title) + '</span><a class="btn btn-small" href="' + esc(t.resource.url) + '" target="_blank" rel="noopener">Resource: ' + esc(t.resource.label) + '</a></div></div>'
-          ).join('') +
-          '<a class="btn btn-small btn-solid" href="#/learn">Open in Learn</a>' +
-        '</div>' +
-      '</div>'
-    ).join('');
+          progressBar(s.pct, s.done + '/' + s.total) +
+          (s.complete ? '<span class="badge-done">Done</span>' : '') + '</div>' +
+          '<div class="skill-body"><p class="card-text" style="margin-bottom:10px">' + s.total + ' topics in this skill.</p>' +
+          s.topics.map(function (t) {
+            return '<div class="topic" style="opacity:.75;padding:10px 12px"><div class="topic-title" style="font-size:13px">' + esc(t.title) + '</div></div>';
+          }).join('') +
+          '<a class="btn btn-small btn-solid" href="#/learn" style="margin-top:8px">Open in Learn</a></div></div>';
+      }).join('');
 
-    app.innerHTML = html;
-    document.querySelectorAll('.skill-row-head').forEach(h =>
-      h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
-    await syncShell();
+      app.innerHTML = html;
+      document.querySelectorAll('.skill-head').forEach(function (h) {
+        h.addEventListener('click', function () { h.parentElement.classList.toggle('open'); });
+      });
+      syncShell();
+    }).catch(function (e) {
+      app.innerHTML = pageHead('Roadmap', 'No goal yet', '') + '<div class="empty">' + esc(e.message) + '</div><div style="margin-top:16px"><a class="btn btn-solid" href="#/goal">Choose Your Goal</a></div>';
+      syncShell();
+    });
   }
 
-  /* ================= SCREEN 4: LEARN ================= */
-  async function renderLearn() {
-    app.innerHTML = pageHead('Step 3 — Skill up', 'Learn', 'Work through each topic, open the learning resource, then mark it complete. Your roadmap progress updates instantly and is saved.');
-    let data;
-    try { data = await api('/api/progress'); }
-    catch (e) { app.innerHTML += '<div class="empty">' + esc(e.message) + ' <a href="#/goal">Choose a goal</a></div>'; return syncShell(); }
-
-    const wrap = document.createElement('div');
+  /* ================= LEARN ================= */
+  function renderLearn() {
+    app.innerHTML = pageHead('Step 3 - Skill up', 'Learn', 'Open a resource, study, then mark the topic complete. Progress saves instantly.');
+    var wrap = document.createElement('div');
     app.appendChild(wrap);
 
-    async function draw() {
-      const fresh = await api('/api/progress');
-      wrap.innerHTML = fresh.skills.map((s, i) => {
-        return '<div class="skill-row open" data-skill="' + esc(s.skill.id) + '">' +
-          '<div class="skill-row-head" style="cursor:default">' +
-            '<span class="skill-num">' + String(i + 1).padStart(2, '0') + '</span>' +
+    function draw() {
+      return api('/api/progress').then(function (fresh) {
+        wrap.innerHTML = fresh.skills.map(function (s, i) {
+          return '<div class="skill-row open">' +
+            '<div class="skill-head" style="cursor:default">' +
+            '<span class="skill-num">' + ('0' + (i + 1)).slice(-2) + '</span>' +
             '<span class="skill-name">' + esc(s.skill.name) + '</span>' +
             progressBar(s.pct, s.done + '/' + s.total) +
-            (s.complete ? '<span class="badge-done">Skill Complete</span>' : '') +
-          '</div>' +
-          '<div class="skill-body" style="display:block">' +
-            s.topics.map(t =>
-              '<div class="topic ' + (t.done ? 'complete' : '') + '" data-topic="' + esc(t.id) + '">' +
+            (s.complete ? '<span class="badge-done">Skill Complete</span>' : '') + '</div>' +
+            '<div class="skill-body">' +
+            s.topics.map(function (t) {
+              return '<div class="topic ' + (t.done ? 'complete' : '') + '" data-topic="' + esc(t.id) + '">' +
                 '<div class="topic-top"><span class="topic-title">' + esc(t.title) + '</span>' +
                 (t.done ? '<span class="badge-done">Complete</span>' : '') + '</div>' +
                 '<div class="topic-desc">' + esc(t.description) + '</div>' +
                 '<div class="topic-actions">' +
-                  '<a class="btn btn-small" href="' + esc(t.resource.url) + '" target="_blank" rel="noopener">Start Learning: ' + esc(t.resource.label) + '</a>' +
-                  '<button class="btn btn-small ' + (t.done ? '' : 'btn-solid') + '" data-toggle="' + esc(t.id) + '">' + (t.done ? 'Undo' : 'Mark Complete') + '</button>' +
-                '</div>' +
-              '</div>'
-            ).join('') +
-          '</div>' +
-        '</div>';
-      }).join('');
+                '<a class="btn btn-small" href="' + esc(t.resource.url) + '" target="_blank" rel="noopener">Start Learning: ' + esc(t.resource.label) + '</a>' +
+                '<button class="btn btn-small ' + (t.done ? '' : 'btn-solid') + '" data-toggle="' + esc(t.id) + '">' + (t.done ? 'Undo' : 'Mark Complete') + '</button>' +
+                '</div></div>';
+            }).join('') + '</div></div>';
+        }).join('');
 
-      wrap.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', async () => {
-        b.disabled = true;
-        const row = wrap.querySelector('[data-topic="' + b.dataset.toggle + '"]');
-        const willComplete = !row.classList.contains('complete');
-        try {
-          const r = await api('/api/topic/' + b.dataset.toggle + '/complete', { method: 'POST', body: { complete: willComplete } });
-          toast(willComplete ? 'Topic complete — skill now ' + r.skill.pct + '%' : 'Topic unmarked');
-          await draw();
-        } catch (err) { toast(err.message); b.disabled = false; }
-      }));
-    }
-    await draw();
-    await syncShell();
-  }
-
-  /* ================= SCREEN 5: PRACTICE ================= */
-  async function renderPractice() {
-    app.innerHTML = pageHead('Step 4 — Apply your skills', 'Practice', 'Real projects that go into your portfolio. Start a project, follow the steps, then mark it completed to earn a certificate.');
-    let data;
-    try { data = await api('/api/progress'); }
-    catch (e) { app.innerHTML += '<div class="empty">' + esc(e.message) + ' <a href="#/goal">Choose a goal</a></div>'; return syncShell(); }
-
-    app.innerHTML += '<div class="grid grid-2">' + data.projects.map(({ project: p, started, completed }) =>
-      '<div class="card" data-project="' + esc(p.id) + '">' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;"><span class="tag tag-fill">' + esc(p.level) + '</span>' +
-        (completed ? '<span class="badge-done">Completed</span>' : started ? '<span class="tag">In Progress</span>' : '') + '</div>' +
-        '<div class="card-title">' + esc(p.title) + '</div>' +
-        '<div class="card-text">' + esc(p.description) + '</div>' +
-        '<div>' + p.skills.map(s => '<span class="tag">' + esc(s) + '</span>').join(' ') + '</div>' +
-        '<ol class="steps">' + p.steps.map(s => '<li>' + esc(s) + '</li>').join('') + '</ol>' +
-        '<div class="card-foot">' +
-          '<button class="btn btn-small" data-start="' + esc(p.id) + '" ' + (started || completed ? 'disabled' : '') + '>' + (started && !completed ? 'Started' : 'Start Project') + '</button>' +
-          '<button class="btn btn-small ' + (completed ? 'btn-done' : 'btn-solid') + '" data-complete="' + esc(p.id) + '" ' + (completed ? 'disabled' : '') + '>' + (completed ? 'Added to Portfolio' : 'Mark as Completed') + '</button>' +
-        '</div>' +
-      '</div>'
-    ).join('') + '</div>';
-
-    document.querySelectorAll('[data-start]').forEach(b => b.addEventListener('click', async () => {
-      b.disabled = true;
-      try {
-        await api('/api/project/' + b.dataset.start + '/start', { method: 'POST' });
-        toast('Project started — good luck!');
-        renderPractice();
-      } catch (err) { toast(err.message); b.disabled = false; }
-    }));
-
-    document.querySelectorAll('[data-complete]').forEach(b => b.addEventListener('click', async () => {
-      b.disabled = true;
-      try {
-        await api('/api/project/' + b.dataset.complete + '/complete', { method: 'POST' });
-        toast('Completed! Added to your portfolio with a certificate');
-        renderPractice();
-      } catch (err) { toast(err.message); b.disabled = false; }
-    }));
-    await syncShell();
-  }
-
-  /* ================= SCREEN 6: PORTFOLIO ================= */
-  async function renderPortfolio() {
-    app.innerHTML = pageHead('Step 5 — Show your work', 'My Portfolio', 'Completed practice projects appear here automatically. You can also add your own projects manually.');
-    const wrap = document.createElement('div');
-    app.appendChild(wrap);
-
-    async function draw() {
-      const d = await api('/api/portfolio');
-      let html = '<div class="grid grid-4" style="margin-bottom:34px">' +
-        '<div class="stat"><div class="stat-num">' + d.items.length + '</div><div class="stat-label">Portfolio Items</div></div>' +
-        '<div class="stat"><div class="stat-num">' + d.certificates.length + '</div><div class="stat-label">Certificates</div></div>' +
-        '<div class="stat"><div class="stat-num">' + (d.career ? d.career.skills.reduce((a, s) => a + s.topics.length, 0) : 0) + '</div><div class="stat-label">Topics on Roadmap</div></div>' +
-        '<div class="stat"><div class="stat-num">' + (d.career ? d.career.name.split(' ')[0] : '—') + '</div><div class="stat-label">Career Goal</div></div>' +
-      '</div>';
-
-      html += '<h2 class="card-title" style="margin-bottom:14px">Projects</h2>';
-      html += d.items.length ? '<div class="grid grid-2">' + d.items.map(i =>
-        '<div class="card">' +
-          '<div style="display:flex;justify-content:space-between;gap:8px;align-items:start">' +
-            '<div class="card-title">' + esc(i.title) + '</div>' +
-            '<span class="tag">' + (i.origin === 'practice' ? 'Practice' : 'My Project') + '</span></div>' +
-          '<div class="card-text">' + esc(i.description) + '</div>' +
-          '<div>' + (i.skills || []).map(s => '<span class="tag">' + esc(s) + '</span>').join(' ') + '</div>' +
-          '<div class="card-foot"><span class="card-text">Added ' + esc(i.date) + '</span>' +
-          '<button class="btn btn-small btn-ghost" data-del="' + esc(i.id) + '">Remove</button></div>' +
-        '</div>'
-      ).join('') + '</div>' : '<div class="empty">No projects yet — finish a practice project or add one below</div>';
-
-      html += '<h2 class="card-title" style="margin:34px 0 14px">Certificates & Achievements</h2>';
-      html += d.certificates.length ? '<div class="grid grid-3">' + d.certificates.map(c =>
-        '<div class="card" style="background:var(--soft)">' +
-          '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2px">Certificate of Completion</div>' +
-          '<div class="card-title">' + esc(c.title) + '</div>' +
-          '<div class="card-text">Issued by ' + esc(c.issuer) + ' &middot; ' + esc(c.career) + ' &middot; ' + esc(c.date) + '</div>' +
-        '</div>'
-      ).join('') + '</div>' : '<div class="empty">Complete a practice project to earn your first certificate</div>';
-
-      html += '<h2 class="card-title" style="margin:34px 0 14px">Add Project</h2>' +
-        '<div class="form-box"><form id="add-project-form">' +
-          '<div class="field"><label for="pf-title">Project title</label><input id="pf-title" required maxlength="120" placeholder="e.g. Bird Count Web App"></div>' +
-          '<div class="field"><label for="pf-desc">Description</label><textarea id="pf-desc" required maxlength="600" placeholder="What did you build or research? What was the outcome?"></textarea></div>' +
-          '<div class="field"><label for="pf-skills">Skills used (comma separated)</label><input id="pf-skills" placeholder="e.g. Data Analysis, Python, Research Writing"></div>' +
-          '<button class="btn btn-solid" type="submit">Add Project</button>' +
-        '</form></div>';
-
-      wrap.innerHTML = html;
-
-      wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
-        await api('/api/portfolio/' + b.dataset.del, { method: 'DELETE' });
-        toast('Project removed');
-        draw();
-      }));
-
-      document.getElementById('add-project-form').addEventListener('submit', async e => {
-        e.preventDefault();
-        const btnEl = e.target.querySelector('button');
-        btnEl.disabled = true;
-        try {
-          await api('/api/portfolio', {
-            method: 'POST',
-            body: {
-              title: document.getElementById('pf-title').value,
-              description: document.getElementById('pf-desc').value,
-              skills: document.getElementById('pf-skills').value.split(',').map(s => s.trim()).filter(Boolean)
-            }
+        wrap.querySelectorAll('[data-toggle]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            b.disabled = true;
+            var row = wrap.querySelector('[data-topic="' + b.getAttribute('data-toggle') + '"]');
+            var willComplete = !row.classList.contains('complete');
+            api('/api/topic/' + b.getAttribute('data-toggle') + '/complete', { method: 'POST', body: { complete: willComplete } })
+              .then(function (r) {
+                toast(willComplete ? 'Topic complete - skill now ' + r.skill.pct + '%' : 'Topic unmarked');
+                draw();
+              })
+              .catch(function (e) { toast(e.message); b.disabled = false; });
           });
-          toast('Project added to portfolio');
-          draw();
-        } catch (err) { toast(err.message); btnEl.disabled = false; }
+        });
       });
     }
-    await draw();
-    await syncShell();
+    draw().catch(function (e) {
+      app.innerHTML = pageHead('Learn', 'No goal yet', '') + '<div class="empty">' + esc(e.message) + '</div><div style="margin-top:16px"><a class="btn btn-solid" href="#/goal">Choose Your Goal</a></div>';
+    });
+    syncShell();
   }
 
-  /* ================= SCREEN 7: CONNECT ================= */
-  async function renderConnect() {
-    app.innerHTML = pageHead('Step 6 — Grow your network', 'Connect', 'Mentors, creators, fellow learners and organizations matched to your career goal.');
-    const types = [['all', 'Everyone'], ['mentor', 'Mentors'], ['creator', 'Creators'], ['learner', 'Learners'], ['organization', 'Organizations']];
-    let activeType = 'all';
+  /* ================= PRACTICE (Projects + Quizzes) ================= */
+  function renderPractice() {
+    app.innerHTML = pageHead('Step 4 - Apply your skills', 'Practice', 'Hands-on projects and skill quizzes. Completed projects go straight into your portfolio with a certificate.') +
+      '<div class="chips" id="prac-chips">' +
+      '<button class="btn btn-small active" data-tab="projects">Projects</button>' +
+      '<button class="btn btn-small" data-tab="quiz">Quizzes</button></div>' +
+      '<div id="prac-body"></div>';
+    var body = document.getElementById('prac-body');
+    var tab = 'projects';
 
-    const wrap = document.createElement('div');
-    app.innerHTML += '<div class="filter-row" id="connect-filters">' + types.map(([v, l]) =>
-      '<button class="btn btn-small ' + (v === 'all' ? 'active' : '') + '" data-type="' + v + '">' + l + '</button>').join('') + '</div>';
-    app.appendChild(wrap);
+    function drawProjects() {
+      api('/api/progress').then(function (data) {
+        body.innerHTML = '<div class="grid grid-2">' + data.projects.map(function (x) {
+          var p = x.project;
+          return '<div class="card">' +
+            '<div style="display:flex;gap:7px;flex-wrap:wrap"><span class="tag tag-fill">' + esc(p.level) + '</span>' +
+            (x.completed ? '<span class="badge-done">Completed</span>' : x.started ? '<span class="tag">In Progress</span>' : '') + '</div>' +
+            '<div class="card-title">' + esc(p.title) + '</div>' +
+            '<div class="card-text">' + esc(p.description) + '</div>' +
+            '<div>' + p.skills.map(function (s) { return '<span class="tag">' + esc(s) + '</span>'; }).join(' ') + '</div>' +
+            '<ol class="steps">' + p.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+            '<div class="card-foot">' +
+            '<button class="btn btn-small" data-start="' + esc(p.id) + '" ' + (x.started || x.completed ? 'disabled' : '') + '>' + (x.started && !x.completed ? 'Started' : 'Start Project') + '</button>' +
+            '<button class="btn btn-small ' + (x.completed ? 'btn-done' : 'btn-solid') + '" data-complete="' + esc(p.id) + '" ' + (x.completed ? 'disabled' : '') + '>' + (x.completed ? 'In Portfolio' : 'Mark Completed') + '</button>' +
+            '</div></div>';
+        }).join('') + '</div>';
 
-    async function draw() {
-      const d = await api('/api/people' + (activeType !== 'all' ? '?type=' + activeType : ''));
-      const careerNames = {};
-      wrap.innerHTML = '<div class="grid grid-3">' + d.people.map(p =>
-        '<div class="card" data-person="' + esc(p.id) + '">' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag tag-fill">' + esc(p.type) + '</span></div>' +
-          '<div class="card-title">' + esc(p.name) + '</div>' +
-          '<div class="card-text"><strong>' + esc(p.role) + '</strong><br>' + esc(p.org) + '</div>' +
-          '<div class="card-text person-bio hidden">' + esc(p.bio) + '<br><br>' + p.tags.map(t => '<span class="tag">' + esc(t) + '</span>').join(' ') + '</div>' +
-          '<div class="card-foot">' +
-            '<button class="btn btn-small" data-profile="' + esc(p.id) + '">View Profile</button>' +
-            '<button class="btn btn-small ' + (p.connected ? 'btn-done' : 'btn-solid') + '" data-connect="' + esc(p.id) + '" ' + (p.connected ? 'disabled' : '') + '>' + (p.connected ? 'Connected' : 'Connect') + '</button>' +
-          '</div>' +
-        '</div>'
-      ).join('') + '</div>';
-
-      wrap.querySelectorAll('[data-profile]').forEach(b => b.addEventListener('click', () => {
-        const bio = wrap.querySelector('[data-person="' + b.dataset.profile + '"] .person-bio');
-        bio.classList.toggle('hidden');
-      }));
-      wrap.querySelectorAll('[data-connect]').forEach(b => b.addEventListener('click', async () => {
-        b.disabled = true;
-        try {
-          const r = await api('/api/connect', { method: 'POST', body: { personId: b.dataset.connect } });
-          toast('Connected — your network is growing (' + r.connected + ' total)');
-          draw();
-        } catch (err) { toast(err.message); b.disabled = false; }
-      }));
+        body.querySelectorAll('[data-start]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            b.disabled = true;
+            api('/api/project/' + b.getAttribute('data-start') + '/start', { method: 'POST' })
+              .then(function () { toast('Project started - good luck!'); drawProjects(); })
+              .catch(function (e) { toast(e.message); b.disabled = false; });
+          });
+        });
+        body.querySelectorAll('[data-complete]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            b.disabled = true;
+            api('/api/project/' + b.getAttribute('data-complete') + '/complete', { method: 'POST' })
+              .then(function () { toast('Completed! Added to portfolio + certificate earned'); drawProjects(); })
+              .catch(function (e) { toast(e.message); b.disabled = false; });
+          });
+        });
+      }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
     }
 
-    document.querySelectorAll('#connect-filters [data-type]').forEach(b => b.addEventListener('click', () => {
-      activeType = b.dataset.type;
-      document.querySelectorAll('#connect-filters [data-type]').forEach(x => x.classList.toggle('active', x === b));
-      draw();
-    }));
-    await draw();
-    await syncShell();
+    function drawQuiz() {
+      api('/api/quiz').then(function (d) {
+        if (!d.questions.length) { body.innerHTML = '<div class="empty">No quiz for this goal yet</div>'; return; }
+        body.innerHTML =
+          (d.best ? '<div class="next-step-bar" style="margin-bottom:16px"><strong>Best score</strong><span>' + d.best.score + ' / ' + d.best.total + ' (' + esc(d.best.date) + ')</span></div>' : '') +
+          d.questions.map(function (q, qi) {
+            return '<div class="quiz-q" data-q="' + qi + '"><div class="card-text" style="color:var(--ink);font-weight:800">' + (qi + 1) + '. ' + esc(q.q) + '</div>' +
+              q.options.map(function (opt, oi) {
+                return '<button class="quiz-opt" data-q="' + qi + '" data-o="' + oi + '">' + esc(opt) + '</button>';
+              }).join('') +
+              '<div class="quiz-why" data-why="' + qi + '"></div></div>';
+          }).join('') +
+          '<button class="btn btn-solid btn-block" id="quiz-submit" style="margin-top:8px">Submit Answers</button>' +
+          '<div id="quiz-result" style="margin-top:16px"></div>';
+
+        var picks = {};
+        body.querySelectorAll('.quiz-opt').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var qi = b.getAttribute('data-q'), oi = parseInt(b.getAttribute('data-o'), 10);
+            picks[qi] = oi;
+            body.querySelectorAll('.quiz-opt[data-q="' + qi + '"]').forEach(function (x) { x.classList.remove('picked'); });
+            b.classList.add('picked');
+          });
+        });
+
+        document.getElementById('quiz-submit').addEventListener('click', function () {
+          var btn = this; btn.disabled = true;
+          var answers = d.questions.map(function (_, i) { return (i in picks) ? picks[i] : null; });
+          api('/api/quiz/submit', { method: 'POST', body: { answers: answers } }).then(function (r) {
+            r.results.forEach(function (res, i) {
+              body.querySelectorAll('.quiz-opt[data-q="' + i + '"]').forEach(function (x) {
+                var oi = parseInt(x.getAttribute('data-o'), 10);
+                x.disabled = true;
+                if (oi === res.correctIndex) x.classList.add('right');
+                else if (oi === res.yourIndex) x.classList.add('wrong');
+              });
+              var why = body.querySelector('[data-why="' + i + '"]');
+              why.textContent = (res.right ? 'Correct. ' : 'Not quite. ') + res.why;
+              why.classList.add('show');
+            });
+            document.getElementById('quiz-result').innerHTML =
+              '<div class="next-step-bar"><strong>Your score</strong><span>' + r.score + ' / ' + r.total + ' (' + Math.round(r.score / r.total * 100) + '%)' +
+              (r.best ? ' &middot; Best: ' + r.best.score + '/' + r.best.total : '') + '</span>' +
+              '<button class="btn btn-small" id="quiz-retry">Try Again</button></div>';
+            document.getElementById('quiz-retry').addEventListener('click', drawQuiz);
+            toast('Quiz graded: ' + r.score + '/' + r.total);
+          }).catch(function (e) { toast(e.message); btn.disabled = false; });
+        });
+      }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+    }
+
+    document.querySelectorAll('#prac-chips [data-tab]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        tab = b.getAttribute('data-tab');
+        document.querySelectorAll('#prac-chips [data-tab]').forEach(function (x) { x.classList.toggle('active', x === b); });
+        if (tab === 'projects') drawProjects(); else drawQuiz();
+      });
+    });
+    drawProjects();
+    syncShell();
   }
 
-  /* ================= SCREEN 8: OPPORTUNITIES ================= */
-  async function renderOpportunities() {
-    app.innerHTML = pageHead('Final step — Real opportunities', 'Opportunities', 'Internships, research programs, competitions, projects and collaborations matched to your goal.');
-    const types = [['all', 'All'], ['Internship', 'Internships'], ['Research', 'Research'], ['Project', 'Projects'], ['Competition', 'Competitions'], ['Collaboration', 'Collaborations']];
-    let activeType = 'all';
-    let all = [];
+  /* ================= PORTFOLIO ================= */
+  function renderPortfolio() {
+    app.innerHTML = pageHead('Step 5 - Show your work', 'My Portfolio', 'Showcase your projects, skills and certificates. Share it with recruiters.') +
+      '<div class="chips" id="pf-chips">' +
+      '<button class="btn btn-small active" data-tab="projects">Projects</button>' +
+      '<button class="btn btn-small" data-tab="certificates">Certificates</button></div>' +
+      '<div id="pf-body"></div>';
+    var body = document.getElementById('pf-body');
 
-    const wrap = document.createElement('div');
-    app.innerHTML += '<div class="filter-row" id="opp-filters">' + types.map(([v, l]) =>
-      '<button class="btn btn-small ' + (v === 'all' ? 'active' : '') + '" data-type="' + v + '">' + l + '</button>').join('') + '</div>';
-    app.appendChild(wrap);
+    function draw(tab) {
+      api('/api/portfolio').then(function (d) {
+        if (tab === 'projects') {
+          body.innerHTML =
+            '<div class="grid grid-4" style="margin-bottom:18px">' +
+            '<div class="stat"><div class="stat-num">' + d.items.length + '</div><div class="stat-label">Projects</div></div>' +
+            '<div class="stat"><div class="stat-num">' + d.certificates.length + '</div><div class="stat-label">Certificates</div></div>' +
+            '<div class="stat"><div class="stat-num">' + (d.career ? d.career.skills.length : 0) + '</div><div class="stat-label">Skills</div></div>' +
+            '<div class="stat"><div class="stat-num">' + d.items.length + '</div><div class="stat-label">Items</div></div></div>' +
+            (d.items.length ? '<div class="grid grid-2">' + d.items.map(function (i) {
+              return '<div class="card">' +
+                '<div style="display:flex;justify-content:space-between;gap:8px;align-items:start">' +
+                '<div class="card-title">' + esc(i.title) + '</div><span class="tag">' + (i.origin === 'practice' ? 'Practice' : 'My Project') + '</span></div>' +
+                '<div class="card-text">' + esc(i.description) + '</div>' +
+                '<div>' + (i.skills || []).map(function (s) { return '<span class="tag">' + esc(s) + '</span>'; }).join(' ') + '</div>' +
+                '<div class="card-foot"><span class="card-text">' + esc(i.date) + '</span>' +
+                '<button class="btn btn-small btn-ghost" data-del="' + esc(i.id) + '">Remove</button></div></div>';
+            }).join('') + '</div>' : '<div class="empty">No projects yet - finish a practice project or add one below</div>') +
+
+            '<h2 class="card-title" style="margin:26px 0 12px">Add Project</h2>' +
+            '<div class="form-box"><form id="add-pf">' +
+            '<div class="field"><label>Project title</label><input id="pf-title" required maxlength="120" placeholder="e.g. Bird Count Web App"></div>' +
+            '<div class="field"><label>Description</label><textarea id="pf-desc" required maxlength="600" placeholder="What did you build or research?"></textarea></div>' +
+            '<div class="field"><label>Skills used (comma separated)</label><input id="pf-skills" placeholder="Python, Data Analysis"></div>' +
+            '<button class="btn btn-solid" type="submit">Add Project</button></form></div>';
+
+          body.querySelectorAll('[data-del]').forEach(function (b) {
+            b.addEventListener('click', function () {
+              api('/api/portfolio/' + b.getAttribute('data-del'), { method: 'DELETE' })
+                .then(function () { toast('Project removed'); draw('projects'); });
+            });
+          });
+          document.getElementById('add-pf').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var btn = e.target.querySelector('button'); btn.disabled = true;
+            api('/api/portfolio', {
+              method: 'POST',
+              body: {
+                title: document.getElementById('pf-title').value,
+                description: document.getElementById('pf-desc').value,
+                skills: document.getElementById('pf-skills').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+              }
+            }).then(function () { toast('Project added'); draw('projects'); })
+              .catch(function (e2) { toast(e2.message); btn.disabled = false; });
+          });
+        } else {
+          body.innerHTML = d.certificates.length ? '<div class="grid grid-2">' + d.certificates.map(function (c) {
+            return '<div class="card" style="background:var(--soft)">' +
+              '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px">Certificate of Completion</div>' +
+              '<div class="card-title">' + esc(c.title) + '</div>' +
+              '<div class="card-text">Issued by ' + esc(c.issuer) + ' &middot; ' + esc(c.career) + ' &middot; ' + esc(c.date) + '</div></div>';
+          }).join('') + '</div>' : '<div class="empty">Complete a practice project to earn your first certificate</div>';
+        }
+      });
+    }
+
+    document.querySelectorAll('#pf-chips [data-tab]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#pf-chips [data-tab]').forEach(function (x) { x.classList.toggle('active', x === b); });
+        draw(b.getAttribute('data-tab'));
+      });
+    });
+    draw('projects');
+    syncShell();
+  }
+
+  /* ================= CONNECT ================= */
+  function renderConnect() {
+    app.innerHTML = pageHead('Step 6 - Grow your network', 'Connect', 'Mentors, creators, fellow learners and organizations matched to your goal.') +
+      '<div class="chips" id="cn-chips">' +
+      '<button class="btn btn-small active" data-tab="mentorship">Mentorship</button>' +
+      '<button class="btn btn-small" data-tab="community">Community</button>' +
+      '<button class="btn btn-small" data-tab="orgs">Organizations</button></div>' +
+      '<div id="cn-body"></div>';
+    var body = document.getElementById('cn-body');
+
+    function personCard(p, actionLabel) {
+      return '<div class="card" data-person="' + esc(p.id) + '">' +
+        '<div class="row-item" style="border:none;padding:0;margin:0;cursor:default">' +
+        '<div class="row-ico">' + esc(p.name.charAt(0)) + '</div>' +
+        '<div class="row-main"><div class="row-title">' + esc(p.name) + '</div><div class="row-sub">' + esc(p.role) + '</div></div></div>' +
+        '<div class="card-text person-bio hidden" style="margin-top:6px">' + esc(p.bio) + '<br><br>' + p.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join(' ') + '</div>' +
+        '<div class="card-foot">' +
+        '<button class="btn btn-small" data-profile="' + esc(p.id) + '">View Profile</button>' +
+        (p.type === 'mentor' ? '<a class="btn btn-small" href="mailto:mentor@elevo.app?subject=' + encodeURIComponent('Session request for ' + p.name) + '">Book a Session</a>' : '') +
+        '<button class="btn btn-small ' + (p.connected ? 'btn-done' : 'btn-solid') + '" data-connect="' + esc(p.id) + '" ' + (p.connected ? 'disabled' : '') + '>' + (p.connected ? 'Connected' : actionLabel) + '</button>' +
+        '</div></div>';
+    }
+
+    function bindCards() {
+      body.querySelectorAll('[data-profile]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          body.querySelector('[data-person="' + b.getAttribute('data-profile') + '"] .person-bio').classList.toggle('hidden');
+        });
+      });
+      body.querySelectorAll('[data-connect]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          b.disabled = true;
+          api('/api/connect', { method: 'POST', body: { personId: b.getAttribute('data-connect') } })
+            .then(function () { toast('Connected'); draw(activeTab); })
+            .catch(function (e) { toast(e.message); b.disabled = false; });
+        });
+      });
+    }
+
+    var activeTab = 'mentorship';
+    function draw(tab) {
+      activeTab = tab;
+      api('/api/people').then(function (d) {
+        var list = d.people;
+        if (tab === 'mentorship') list = list.filter(function (p) { return p.type === 'mentor' || p.type === 'creator'; });
+        else if (tab === 'community') list = list.filter(function (p) { return p.type === 'learner'; });
+        else list = list.filter(function (p) { return p.type === 'organization'; });
+        body.innerHTML = '<div class="grid grid-2">' + list.map(function (p) {
+          return personCard(p, tab === 'community' ? 'Join' : tab === 'orgs' ? 'Follow' : 'Connect');
+        }).join('') + '</div>';
+        bindCards();
+      });
+    }
+
+    document.querySelectorAll('#cn-chips [data-tab]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#cn-chips [data-tab]').forEach(function (x) { x.classList.toggle('active', x === b); });
+        draw(b.getAttribute('data-tab'));
+      });
+    });
+    draw('mentorship');
+    syncShell();
+  }
+
+  /* ================= OPPORTUNITIES ================= */
+  function renderOpportunities() {
+    app.innerHTML = pageHead('Final step - Real opportunities', 'Opportunities', 'Internships, research programs, competitions, projects and collaborations.') +
+      '<div class="chips" id="opp-chips">' +
+      ['All', 'Internship', 'Research', 'Project', 'Competition', 'Collaboration'].map(function (t, i) {
+        return '<button class="btn btn-small ' + (i === 0 ? 'active' : '') + '" data-type="' + t + '">' + t + 's</button>';
+      }).join('') + '</div><div id="opp-body"></div>';
+    var body = document.getElementById('opp-body');
+    var all = [], active = 'All';
 
     function draw() {
-      const list = all.filter(o => activeType === 'all' || o.type === activeType);
-      wrap.innerHTML = '<div class="grid grid-2">' + list.map(o =>
-        '<div class="card">' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag tag-fill">' + esc(o.type) + '</span><span class="tag">' + esc(o.location.split('(')[0].trim()) + '</span></div>' +
+      var list = all.filter(function (o) { return active === 'All' || o.type === active; });
+      body.innerHTML = '<div class="grid grid-2">' + list.map(function (o) {
+        return '<div class="card">' +
+          '<div style="display:flex;gap:7px;flex-wrap:wrap"><span class="tag tag-fill">' + esc(o.type) + '</span><span class="tag">' + esc(o.duration) + '</span></div>' +
           '<div class="card-title">' + esc(o.title) + '</div>' +
-          '<div class="card-text"><strong>' + esc(o.org) + '</strong><br>' + esc(o.duration) + ' &middot; Deadline ' + esc(o.deadline) + '</div>' +
-          '<div class="card-foot"><a class="btn btn-small btn-solid" href="#/opportunity/' + esc(o.id) + '">View Details</a></div>' +
-        '</div>'
-      ).join('') + (list.length ? '' : '<div class="empty">No opportunities in this category yet</div>') + '</div>';
+          '<div class="card-text"><strong>' + esc(o.org) + '</strong><br>' + esc(o.location) + ' &middot; Deadline ' + esc(o.deadline) + '</div>' +
+          '<div class="card-foot"><a class="btn btn-small btn-solid" href="#/opportunity/' + esc(o.id) + '">View Details</a></div></div>';
+      }).join('') + (list.length ? '' : '<div class="empty">Nothing in this category yet</div>') + '</div>';
     }
 
-    document.querySelectorAll('#opp-filters [data-type]').forEach(b => b.addEventListener('click', () => {
-      activeType = b.dataset.type;
-      document.querySelectorAll('#opp-filters [data-type]').forEach(x => x.classList.toggle('active', x === b));
-      draw();
-    }));
-
-    const d = await api('/api/opportunities');
-    all = d.opportunities;
-    draw();
-    await syncShell();
+    document.querySelectorAll('#opp-chips [data-type]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        active = b.getAttribute('data-type');
+        document.querySelectorAll('#opp-chips [data-type]').forEach(function (x) { x.classList.toggle('active', x === b); });
+        draw();
+      });
+    });
+    api('/api/opportunities').then(function (d) { all = d.opportunities; draw(); });
+    syncShell();
   }
 
-  async function renderOpportunityDetail(id) {
+  function renderOpportunityDetail(id) {
     app.innerHTML = pageHead('Opportunity', 'Loading...', '');
-    let o;
-    try { o = await api('/api/opportunities/' + id); }
-    catch (e) { app.innerHTML = pageHead('Error', 'Not found', e.message) + '<a class="btn" href="#/opportunities">Back to opportunities</a>'; return syncShell(); }
-
-    const careers = (await api('/api/opportunities')).careers;
-    const careerName = (careers.find(c => c.id === o.career) || {}).name || o.career;
-
-    const mailto = 'mailto:' + o.applyTo + '?subject=' + encodeURIComponent('Application: ' + o.title) + '&body=' + encodeURIComponent('Hi ' + o.org + ' team,\n\nI am applying for the ' + o.title + ' opportunity on ELEVO.\n\nCareer goal: ' + careerName + '\nELEVO portfolio: I can share my projects and certificates.\n\nBest regards');
-
-    app.innerHTML = pageHead(o.type + ' — ' + careerName, o.title, o.description) +
-      '<ul class="detail-list">' +
+    api('/api/opportunities/' + id).then(function (o) {
+      var mailto = 'mailto:' + o.applyTo +
+        '?subject=' + encodeURIComponent('Application: ' + o.title) +
+        '&body=' + encodeURIComponent(['Hi ' + o.org + ' team,', '', 'I am applying for the ' + o.title + ' opportunity (listed on ELEVO).', '', 'Career goal: ' + o.career, 'Portfolio and certificates: available on request.', '', 'Best regards'].join('\n'));
+      app.innerHTML = pageHead(o.type, o.title, o.description) +
+        '<ul class="detail-list">' +
         '<li><strong>Organization</strong><span>' + esc(o.org) + '</span></li>' +
         '<li><strong>Location</strong><span>' + esc(o.location) + '</span></li>' +
         '<li><strong>Duration</strong><span>' + esc(o.duration) + '</span></li>' +
-        '<li><strong>Stipend / Prize</strong><span>' + esc(o.stipend) + '</span></li>' +
-        '<li><strong>Deadline</strong><span>' + esc(o.deadline) + '</span></li>' +
-      '</ul>' +
-      '<h2 class="card-title" style="margin:22px 0 12px">Requirements</h2>' +
-      '<ul class="steps">' + o.requirements.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul>' +
-      '<div style="margin-top:26px;display:flex;gap:10px;flex-wrap:wrap">' +
+        '<li><strong>Stipend/Prize</strong><span>' + esc(o.stipend) + '</span></li>' +
+        '<li><strong>Deadline</strong><span>' + esc(o.deadline) + '</span></li></ul>' +
+        '<h2 class="card-title" style="margin:18px 0 10px">Requirements</h2>' +
+        '<ul class="steps">' + o.requirements.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' +
+        '<div style="margin-top:22px;display:flex;gap:8px;flex-wrap:wrap">' +
         '<a class="btn btn-solid" href="' + mailto + '">Apply Now (Email)</a>' +
-        '<a class="btn" href="#/opportunities">Back to Opportunities</a>' +
-        '<a class="btn" href="#/mentor">Ask AI Mentor about this</a>' +
-      '</div>';
-    await syncShell();
+        '<a class="btn" href="#/opportunities">Back</a></div>';
+      syncShell();
+    }).catch(function (e) {
+      app.innerHTML = pageHead('Error', 'Not found', e.message) + '<a class="btn" href="#/opportunities">Back to Opportunities</a>';
+      syncShell();
+    });
   }
 
-  /* ================= SCREEN 9: AI MENTOR ================= */
-  async function renderMentor() {
-    app.innerHTML = pageHead('Your personal guide', 'AI Mentor', 'Ask anything about your journey: what to learn next, how to improve a skill, project ideas, or matching opportunities.');
-    app.innerHTML +=
+  /* ================= AI MENTOR ================= */
+  function renderMentor() {
+    app.innerHTML = pageHead('Always here for you', 'AI Mentor', 'Personalized guidance based on your real progress. Connect a free API key in Settings for live AI answers.') +
       '<div class="chat-box" id="chat-box"></div>' +
       '<form class="chat-form" id="chat-form">' +
-        '<input id="chat-input" type="text" maxlength="300" placeholder="Ask your mentor anything..." autocomplete="off" required>' +
-        '<button class="btn btn-solid" type="submit">Send</button>' +
-      '</form>' +
+      '<input id="chat-input" type="text" maxlength="300" placeholder="Ask me anything..." autocomplete="off" required>' +
+      '<button class="btn btn-solid" type="submit">Send</button></form>' +
       '<div class="quick-asks">' +
-        ['What should I learn next?', 'How can I improve my research skills?', 'Suggest a project', 'Show opportunities', 'How am I doing?'].map(q =>
-          '<button class="btn btn-small" data-ask="' + esc(q) + '">' + esc(q) + '</button>').join('') +
-      '</div>';
+      ['What should I learn next?', 'Create my personalized learning roadmap', 'How can I improve my skills?', 'Suggest a project', 'Show opportunities', 'How am I doing?'].map(function (q) {
+        return '<button class="btn btn-small" data-ask="' + esc(q) + '">' + esc(q) + '</button>';
+      }).join('') + '</div>' +
+      '<div style="margin-top:14px"><a class="btn btn-small btn-ghost" href="#/settings">&#9881; AI Settings</a></div>';
 
-    const box = document.getElementById('chat-box');
-
-    function bubble(role, text) {
-      const div = document.createElement('div');
+    var box = document.getElementById('chat-box');
+    function bubble(role, text, live) {
+      var div = document.createElement('div');
       div.className = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-mentor');
-      div.innerHTML = '<span class="msg-role">' + (role === 'user' ? 'You' : 'ELEVO Mentor') + '</span>' + esc(text);
+      div.innerHTML = '<span class="msg-role">' + (role === 'user' ? 'You' : 'ELEVO Mentor') +
+        (role === 'mentor' ? '<span class="live-badge">' + (live ? 'LIVE AI' : 'DEMO') + '</span>' : '') + '</span>' + esc(text);
       box.appendChild(div);
       box.scrollTop = box.scrollHeight;
     }
-
-    async function loadChat() {
-      const d = await api('/api/mentor');
-      box.innerHTML = '';
-      if (!d.chat.length) bubble('mentor', 'Welcome to ELEVO. I track your goal, roadmap progress and portfolio in real time. What would you like to work on?');
-      else d.chat.forEach(m => bubble(m.role, m.text));
-    }
-
-    async function send(text) {
+    function send(text) {
       if (!text.trim()) return;
       bubble('user', text);
-      const t = document.createElement('div');
+      var t = document.createElement('div');
       t.className = 'typing'; t.textContent = 'THINKING...';
       box.appendChild(t); box.scrollTop = box.scrollHeight;
-      try {
-        const r = await api('/api/mentor', { method: 'POST', body: { message: text } });
-        t.remove();
-        bubble('mentor', r.reply);
-      } catch (err) {
-        t.remove();
-        bubble('mentor', 'Something went wrong: ' + err.message);
-      }
+      api('/api/mentor', { method: 'POST', body: { message: text } }).then(function (r) {
+        t.remove(); bubble('mentor', r.reply, r.live);
+      }).catch(function (e) { t.remove(); bubble('mentor', 'Error: ' + e.message); });
     }
-
-    document.getElementById('chat-form').addEventListener('submit', e => {
+    document.getElementById('chat-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      const input = document.getElementById('chat-input');
-      send(input.value);
-      input.value = '';
+      var input = document.getElementById('chat-input');
+      send(input.value); input.value = '';
     });
-    document.querySelectorAll('[data-ask]').forEach(b => b.addEventListener('click', () => send(b.dataset.ask)));
-
-    await loadChat();
-    await syncShell();
+    document.querySelectorAll('[data-ask]').forEach(function (b) {
+      b.addEventListener('click', function () { send(b.getAttribute('data-ask')); });
+    });
+    api('/api/mentor').then(function (d) {
+      box.innerHTML = '';
+      if (!d.chat.length) bubble('mentor', 'Welcome to ELEVO. I know your goal, roadmap progress and portfolio in real time. What would you like to work on?', false);
+      else d.chat.forEach(function (m) { bubble(m.role, m.text, m.live); });
+    });
+    syncShell();
   }
 
-  /* ================= SCREEN 10: DASHBOARD ================= */
-  async function renderDashboard() {
-    app.innerHTML = pageHead('Your command center', 'Dashboard', '');
-    let d;
-    try { d = await api('/api/dashboard'); }
-    catch (e) { app.innerHTML += '<div class="empty">' + esc(e.message) + ' <a href="#/goal">Choose a goal</a></div>'; return syncShell(); }
+  /* ================= SETTINGS ================= */
+  function renderSettings() {
+    app.innerHTML = pageHead('Preferences', 'Settings', 'Profile, live AI connection and data control.');
+    var body = document.createElement('div');
+    app.appendChild(body);
 
-    const pctSkills = d.totalSkills ? Math.round(d.skillsDone / d.totalSkills * 100) : 0;
+    api('/api/settings').then(function (s) {
+      body.innerHTML =
+        '<div class="form-box" style="margin-bottom:22px"><h2 class="card-title" style="margin-bottom:14px">Profile</h2>' +
+        '<div class="field"><label>Your name (used for greeting)</label><input id="st-name" maxlength="30" value="' + esc(s.profile.name) + '" placeholder="e.g. Ranjim"></div>' +
+        '<button class="btn btn-small btn-solid" id="st-save-name">Save Name</button></div>' +
 
-    app.innerHTML += '<div class="grid grid-4" style="margin-bottom:30px">' +
-      '<div class="stat"><div class="stat-num">' + (d.career ? d.career.name.split(' ')[0] : '—') + '</div><div class="stat-label">Career Goal</div></div>' +
-      '<div class="stat"><div class="stat-num">' + d.skillsDone + '<span style="font-size:20px;color:var(--grey)">/' + d.totalSkills + '</span></div><div class="stat-label">Skills Completed</div></div>' +
-      '<div class="stat"><div class="stat-num">' + d.projectsDone + '<span style="font-size:20px;color:var(--grey)">/' + d.totalProjects + '</span></div><div class="stat-label">Projects Completed</div></div>' +
-      '<div class="stat"><div class="stat-num">' + d.portfolio.length + '</div><div class="stat-label">Portfolio Items</div></div>' +
-    '</div>';
+        '<div class="form-box" style="margin-bottom:22px"><h2 class="card-title" style="margin-bottom:6px">Live AI Mentor</h2>' +
+        '<p class="card-text" style="margin-bottom:14px">Add a free API key to power the mentor with a real LLM. Without a key the built-in demo engine answers instead (always works, no key needed).</p>' +
+        '<div class="field"><label>Provider</label><select id="st-provider">' +
+        '<option value="openrouter" ' + (s.provider === 'openrouter' ? 'selected' : '') + '>OpenRouter (recommended - free models)</option>' +
+        '<option value="huggingface" ' + (s.provider === 'huggingface' ? 'selected' : '') + '>Hugging Face Inference</option></select></div>' +
+        '<div class="field"><label>Model</label><input id="st-model" value="' + esc(s.model) + '" placeholder="openrouter/free or HuggingFaceH4/zephyr-7b-beta"></div>' +
+        '<div class="field"><label>API key ' + (s.hasKey ? '(saved: ' + esc(s.keyPreview) + ')' : '(not set)') + '</label>' +
+        '<input id="st-key" type="password" placeholder="Paste your API key here"></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn btn-small btn-solid" id="st-save-ai">Save AI Settings</button>' +
+        '<button class="btn btn-small" id="st-test">Test Connection</button>' +
+        (s.hasKey ? '<button class="btn btn-small btn-ghost" id="st-clear">Remove Key</button>' : '') +
+        '</div><div id="st-test-out" style="margin-top:12px"></div></div>' +
 
-    let html = '<div class="next-step-bar"><strong>Recommended next step</strong><span>' + esc(d.nextStep ? d.nextStep.label : 'Explore opportunities') + '</span>' +
-      '<a class="btn btn-small btn-solid" href="' + (d.nextStep && d.nextStep.phase === 'LEARN' ? '#/learn' : d.nextStep && d.nextStep.phase === 'PRACTICE' ? '#/practice' : '#/opportunities') + '">Go</a></div>';
+        '<div class="form-box"><h2 class="card-title" style="margin-bottom:6px">Data</h2>' +
+        '<p class="card-text" style="margin-bottom:12px">All your progress is stored locally in this app\'s database file.</p>' +
+        '<button class="btn btn-small btn-ghost" id="st-reset">Reset All Progress</button></div>' +
 
-    html += '<h2 class="card-title" style="margin-bottom:12px">Skill Progress (' + pctSkills + '%)</h2>';
-    html += d.skills.map(s =>
-      '<div class="skill-row" style="margin-bottom:10px"><div class="skill-row-head" style="cursor:default">' +
-        '<span class="skill-name">' + esc(s.skill.name) + '</span>' +
-        progressBar(s.pct, s.done + '/' + s.total) +
-        (s.complete ? '<span class="badge-done">Done</span>' : '') +
-      '</div></div>').join('');
+        '<div class="card-text" style="margin-top:16px;font-size:12px">Free keys: OpenRouter &rarr; openrouter.ai/keys &middot; Hugging Face &rarr; huggingface.co/settings/tokens</div>';
 
-    html += '<h2 class="card-title" style="margin:30px 0 12px">Recent Portfolio</h2>';
-    html += d.portfolio.length ? '<div class="grid grid-3">' + d.portfolio.slice(-3).reverse().map(i =>
-      '<div class="card"><div class="card-title" style="font-size:15px">' + esc(i.title) + '</div><div class="card-text">' + esc(i.date) + '</div></div>').join('') + '</div>'
-      : '<div class="empty">No portfolio items yet — complete a practice project</div>';
+      on('st-save-name', function () {
+        api('/api/settings', { method: 'POST', body: { name: document.getElementById('st-name').value } })
+          .then(function () { toast('Name saved'); });
+      });
 
-    html += '<h2 class="card-title" style="margin:30px 0 12px">Certificates (' + d.certificates.length + ')</h2>';
-    html += d.certificates.length ? '<div class="grid grid-3">' + d.certificates.slice(-3).reverse().map(c =>
-      '<div class="card" style="background:var(--soft)"><div class="card-title" style="font-size:15px">' + esc(c.title) + '</div><div class="card-text">' + esc(c.issuer) + ' &middot; ' + esc(c.date) + '</div></div>').join('') + '</div>'
-      : '<div class="empty">Certificates appear when you complete practice projects</div>';
+      function currentAI() {
+        return {
+          provider: document.getElementById('st-provider').value,
+          model: document.getElementById('st-model').value.trim(),
+          apiKey: document.getElementById('st-key').value.trim()
+        };
+      }
 
-    html += '<div style="margin-top:34px;display:flex;gap:10px;flex-wrap:wrap">' +
-      '<a class="btn btn-solid" href="#/learn">Continue Learning</a>' +
-      '<a class="btn" href="#/practice">Practice</a>' +
-      '<a class="btn" href="#/opportunities">Find Opportunities</a>' +
-      '<a class="btn" href="#/mentor">Ask AI Mentor</a>' +
-    '</div>';
+      on('st-save-ai', function () {
+        var cfg = currentAI();
+        if (!cfg.apiKey && !s.hasKey) { toast('Paste an API key first (or leave AI on demo mode)'); return; }
+        api('/api/settings', { method: 'POST', body: cfg })
+          .then(function () { toast('AI settings saved'); renderSettings(); });
+      });
 
-    app.innerHTML += html;
-    await syncShell();
+      on('st-test', function () {
+        var out = document.getElementById('st-test-out');
+        var cfg = currentAI();
+        if (!cfg.apiKey) { out.innerHTML = '<div class="empty" style="padding:14px">Paste an API key to test</div>'; return; }
+        out.innerHTML = '<div class="typing">TESTING...</div>';
+        api('/api/settings/test', { method: 'POST', body: cfg }).then(function (r) {
+          out.innerHTML = r.ok
+            ? '<div class="next-step-bar" style="margin:0"><strong>Connection OK</strong><span>' + r.latencyMs + 'ms &middot; sample: "' + esc(r.sample) + '"</span></div>'
+            : '<div class="empty" style="padding:14px">' + esc(r.error) + '</div>';
+        }).catch(function (e) { out.innerHTML = '<div class="empty" style="padding:14px">' + esc(e.message) + '</div>'; });
+      });
+
+      var clearBtn = document.getElementById('st-clear');
+      if (clearBtn) clearBtn.addEventListener('click', function () {
+        api('/api/settings', { method: 'POST', body: { clearKey: true } })
+          .then(function () { toast('API key removed - back to demo mode'); renderSettings(); });
+      });
+
+      on('st-reset', function () {
+        if (!confirm('Reset ALL progress, portfolio, chat and settings?')) return;
+        api('/api/reset', { method: 'POST' }).then(function () {
+          toast('Everything reset');
+          location.hash = '#/welcome';
+          setTimeout(function () { location.reload(); }, 400);
+        });
+      });
+    });
+    syncShell();
   }
 
   /* ================= ROUTER ================= */
-  const routes = {
-    welcome: renderWelcome,
-    goal: renderGoal,
-    roadmap: renderRoadmap,
-    learn: renderLearn,
-    practice: renderPractice,
-    portfolio: renderPortfolio,
-    connect: renderConnect,
-    opportunities: renderOpportunities,
-    mentor: renderMentor,
-    dashboard: renderDashboard
-  };
-
-  async function router() {
-    const raw = location.hash.replace(/^#\/?/, '') || 'welcome';
-    const [name, param] = raw.split('/');
+  function router() {
+    closeSheet();
     window.scrollTo(0, 0);
-    if (name === 'opportunity' && param) return renderOpportunityDetail(param);
-    const fn = routes[name] || renderWelcome;
-    try { await fn(); } catch (e) {
-      app.innerHTML = pageHead('Error', 'Something went wrong', e.message) + '<a class="btn" href="#/welcome">Back to start</a>';
+    var raw = location.hash.replace(/^#\/?/, '') || 'welcome';
+    var parts = raw.split('/');
+    var name = parts[0];
+    if (name === 'menu') {
+      sheet.classList.remove('hidden');
+      backdrop.classList.remove('hidden');
+      syncShell();
+      return;
     }
+    var fns = {
+      welcome: renderWelcome, goal: renderGoal, home: renderHome, roadmap: renderRoadmap,
+      learn: renderLearn, practice: renderPractice, portfolio: renderPortfolio,
+      connect: renderConnect, opportunities: renderOpportunities, mentor: renderMentor,
+      settings: renderSettings
+    };
+    if (name === 'opportunity' && parts[1]) return renderOpportunityDetail(parts[1]);
+    (fns[name] || renderWelcome)();
   }
-
-  document.getElementById('reset-btn').addEventListener('click', async () => {
-    if (!confirm('Reset ALL progress, portfolio and chat?')) return;
-    await api('/api/reset', { method: 'POST' });
-    toast('Progress reset');
-    location.hash = '#/welcome';
-    setTimeout(() => location.reload(), 300);
-  });
 
   window.addEventListener('hashchange', router);
   router();
