@@ -214,10 +214,104 @@ const OPPORTUNITIES = [
   { id: 'o10', type: 'Internship', career: 'developer', title: 'Frontend Engineering Intern', org: 'TechFlow', location: 'Remote', duration: '6 months', stipend: 'INR 35,000 / month', deadline: '2026-10-25', description: 'Ship UI features in React, write tests and pair with senior engineers. Conversion to full-time possible.', requirements: ['HTML/CSS/JavaScript solid', 'React basics', 'GitHub profile with projects'], applyTo: 'careers@techflow.example.com' }
 ];
 
+
+/* ============================= QUIZZES ============================= */
+
+const QUIZZES = {
+  'wildlife-researcher': [
+    { q: 'Which best defines a keystone species?', options: ['The most abundant species in an ecosystem', 'A species whose ecosystem impact is disproportionately large relative to its abundance', 'Any invasive species', 'The top predator of a food chain'], correct: 1, why: 'Keystone species have effects far larger than their numbers suggest - removing them collapses the ecosystem.' },
+    { q: 'In a mark-recapture study, which assumption must hold?', options: ['Marked animals quickly lose their marks', 'The population is closed (no births, deaths, migration) during the study', 'All animals are equally catchable whether marked or not', 'Predators remove marked and unmarked animals equally'], correct: 1, why: 'The Lincoln-Petersen estimate assumes a closed population and equal catchability.' },
+    { q: 'What does a camera trap primarily let researchers collect?', options: ['DNA samples', 'Behavioral and occupancy data with minimal disturbance', 'Weather records', 'Soil chemistry data'], correct: 1, why: 'Camera traps record which animals pass, when, and how they behave - without a human present.' },
+    { q: 'A p-value of 0.03 means:', options: ['The result has a 3% chance of being true', 'If the null hypothesis were true, there is a 3% chance of data this extreme', 'The effect size equals 3%', 'The hypothesis is 97% proven'], correct: 1, why: 'A p-value measures surprise under the null hypothesis - it is not the probability the hypothesis is true.' },
+    { q: 'Which section of a scientific paper describes exactly what you did so others can repeat it?', options: ['Abstract', 'Introduction', 'Methods', 'Discussion'], correct: 2, why: 'The Methods section must contain enough detail for independent replication.' }
+  ],
+  'graphic-designer': [
+    { q: 'Which color pairing sits opposite each other on the color wheel?', options: ['Analogous', 'Complementary', 'Monochromatic', 'Triadic'], correct: 1, why: 'Complementary colors (opposites) create the strongest contrast and visual vibration.' },
+    { q: 'What is typographic hierarchy primarily used for?', options: ['Making text as large as possible', 'Guiding the reader through content in order of importance', 'Fitting more words on a page', 'Decorating headings'], correct: 1, why: 'Hierarchy (size, weight, spacing) tells the reader what to read first, second, third.' },
+    { q: 'In Figma, what lets you reuse an element and update every copy at once?', options: ['A frame', 'A slice', 'A component', 'A plugin'], correct: 2, why: 'Components with instances keep designs consistent - edit the main component, all instances update.' },
+    { q: 'What is the core of usability testing?', options: ['Asking designers for opinions', 'Observing real users completing real tasks', 'Counting clicks on a homepage', 'A/B testing button colors only'], correct: 1, why: 'Usability testing reveals where actual users struggle - opinions and guesswork do not.' },
+    { q: 'What must a brand guideline document cover?', options: ['Only the logo file', 'Rules for logo usage, colors, typography and brand voice', 'The company history', 'Pricing of design services'], correct: 1, why: 'Guidelines exist so anyone can apply the brand consistently across every medium.' }
+  ],
+  'developer': [
+    { q: 'What does HTTP status code 404 mean?', options: ['Server error', 'Unauthorized access', 'Resource not found', 'Request successful'], correct: 2, why: '404 = the server could not find the requested resource at that URL.' },
+    { q: 'In Git, what does git merge do?', options: ['Deletes a branch', 'Combines a branch into another, joining their histories', 'Reverts the last commit', 'Copies files to the remote'], correct: 1, why: 'Merge integrates changes from one branch into another, preserving both histories.' },
+    { q: 'Which data structure gives O(1) average lookup by key?', options: ['Array', 'Linked list', 'Stack', 'Hash map'], correct: 3, why: 'A hash map hashes the key to jump straight to the value - no scanning needed.' },
+    { q: 'What is the purpose of a SQL index?', options: ['To store backup copies of rows', 'To speed up lookups and sorting on a column', 'To encrypt a column', 'To link two databases together'], correct: 1, why: 'An index is a data structure (usually a B-tree) that makes searches on a column fast.' },
+    { q: 'Which approach verifies individual functions in isolation?', options: ['Integration testing', 'Unit testing', 'Load testing', 'User acceptance testing'], correct: 1, why: 'Unit tests exercise one function/module with known inputs and expected outputs.' }
+  ],
+  'entrepreneur': [
+    { q: 'What does MVP stand for?', options: ['Most Valuable Player', 'Minimum Viable Product', 'Maximum Value Proposition', 'Market Validation Process'], correct: 1, why: 'An MVP is the smallest version of a product that lets you test your core assumption with real users.' },
+    { q: 'Product-market fit is best indicated by:', options: ['A large social media following', 'Strong retention and customers referring others', 'A polished logo', 'A big office'], correct: 1, why: 'When users stay and tell friends, you have fit - growth tactics come after.' },
+    { q: 'Burn rate measures:', options: ['Revenue growth per month', 'How fast a startup spends its cash', 'Employee turnover', 'Marketing reach'], correct: 1, why: 'Burn rate (cash spent per month) minus revenue = runway - the key survival metric.' },
+    { q: 'How many blocks does a Lean Canvas have?', options: ['5', '7', '9', '12'], correct: 2, why: 'The Lean Canvas has 9 blocks: problem, solution, key metrics, proposition, advantage, channels, segments, costs, revenue.' },
+    { q: 'The "ask" slide of a pitch deck should state:', options: ['Your company history', 'How much funding you need and exactly what it will achieve', 'Your competitors weaknesses', 'Your personal biography'], correct: 1, why: 'Investors want a concrete number tied to milestones - vague asks kill deals.' }
+  ]
+};
+
+/* ============================= REAL AI (OpenRouter / Hugging Face) ============================= */
+
+function buildMentorSystemPrompt(db) {
+  const career = getCareer(db);
+  const sp = career ? skillProgress(db, career) : [];
+  const doneSkills = sp.filter(x => x.complete).length;
+  const step = nextStep(db);
+  return 'You are ELEVO Mentor, a warm, practical career coach for a student learning app. ' +
+    'The student\'s goal: ' + (career ? career.name : 'not chosen yet') + '. ' +
+    'Live progress: ' + doneSkills + '/' + sp.length + ' skills complete, ' + db.completedTopics.length + ' topics done, ' +
+    db.completedProjects.length + ' practice projects done, ' + db.portfolio.length + ' portfolio items. ' +
+    'Recommended next step: ' + (step ? step.label : 'explore opportunities and connect with mentors') + '. ' +
+    'Rules: be encouraging and specific, max 120 words, always end with ONE concrete action the student can do today. ' +
+    'Never invent progress data - use only the numbers above.';
+}
+
+async function callExternalAI(db, userMessage) {
+  const cfg = db.ai || {};
+  if (!cfg.apiKey) return null;
+  const system = buildMentorSystemPrompt(db);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    if (cfg.provider === 'huggingface') {
+      const model = cfg.model || 'HuggingFaceH4/zephyr-7b-beta';
+      const r = await fetch('https://api-inference.huggingface.co/models/' + model, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { Authorization: 'Bearer ' + cfg.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: '<|system|>\n' + system + '\n<|user|>\n' + userMessage + '\n<|assistant|>\n', parameters: { max_new_tokens: 250, temperature: 0.6 } })
+      });
+      if (!r.ok) throw new Error('Hugging Face API returned ' + r.status);
+      const d = await r.json();
+      let text = Array.isArray(d) ? (d[0].generated_text || '') : (d.generated_text || '');
+      text = text.split('<|assistant|>').pop().trim();
+      return text || null;
+    }
+    // default: OpenRouter (OpenAI-compatible, has free models)
+    const model = cfg.model || 'openrouter/free';
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { Authorization: 'Bearer ' + cfg.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: model, messages: [{ role: 'system', content: system }, { role: 'user', content: userMessage }] })
+    });
+    if (!r.ok) throw new Error('OpenRouter API returned ' + r.status);
+    const d = await r.json();
+    const msg = d.choices && d.choices[0] && d.choices[0].message;
+    return (msg && msg.content ? msg.content : '').trim() || null;
+  } catch (e) {
+    console.error('External AI error:', e.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /* ============================= DATABASE ============================= */
 
 const DEFAULT_DB = {
   goal: null,
+  profile: { name: '' },
+  ai: { provider: 'openrouter', apiKey: '', model: 'openrouter/free' },
+  quizBest: {},
   completedTopics: [],
   startedProjects: [],
   completedProjects: [],
@@ -496,17 +590,89 @@ async function handleApi(req, res, pathname) {
     return o ? sendJSON(res, 200, o) : sendJSON(res, 404, { error: 'Opportunity not found.' });
   }
 
-  // POST /api/mentor {message}
+  // POST /api/mentor {message}  (real AI when configured, smart local fallback)
   if (method === 'POST' && pathname === '/api/mentor') {
     const body = await readBody(req);
     const message = (body.message || '').trim();
     if (!message) return sendJSON(res, 400, { error: 'Type a message first.' });
-    const reply = mentorReply(db, message);
+    let live = false, reply = await callExternalAI(db, message);
+    if (reply) live = true;
+    else {
+      reply = mentorReply(db, message);
+      if (db.ai && db.ai.apiKey) reply += '\n\n(Your live AI did not respond just now, so I answered from my built-in engine. Check Settings if this keeps happening.)';
+    }
     db.chat.push({ role: 'user', text: message, time: Date.now() });
-    db.chat.push({ role: 'mentor', text: reply, time: Date.now() });
+    db.chat.push({ role: 'mentor', text: reply, time: Date.now(), live });
     db.chat = db.chat.slice(-60);
     saveDB(db);
-    return sendJSON(res, 200, { reply, chat: db.chat });
+    return sendJSON(res, 200, { reply, live, chat: db.chat });
+  }
+
+  // GET /api/settings  |  POST /api/settings {name?, provider?, apiKey?, model?}
+  if (method === 'GET' && pathname === '/api/settings') {
+    return sendJSON(res, 200, {
+      profile: db.profile,
+      provider: db.ai.provider,
+      model: db.ai.model,
+      hasKey: !!db.ai.apiKey,
+      keyPreview: db.ai.apiKey ? db.ai.apiKey.slice(0, 6) + '...' + db.ai.apiKey.slice(-4) : ''
+    });
+  }
+  if (method === 'POST' && pathname === '/api/settings') {
+    const body = await readBody(req);
+    if (typeof body.name === 'string') db.profile.name = body.name.trim().slice(0, 40);
+    if (body.provider === 'openrouter' || body.provider === 'huggingface') db.ai.provider = body.provider;
+    if (typeof body.apiKey === 'string') {
+      const k = body.apiKey.trim();
+      db.ai.apiKey = k ? k : db.ai.apiKey; // empty string keeps existing key (clear uses clearKey)
+    }
+    if (body.clearKey === true) db.ai.apiKey = '';
+    if (typeof body.model === 'string' && body.model.trim()) db.ai.model = body.model.trim().slice(0, 120);
+    saveDB(db);
+    return sendJSON(res, 200, { ok: true, hasKey: !!db.ai.apiKey });
+  }
+
+  // POST /api/settings/test  {provider, apiKey, model} -> live connection test
+  if (method === 'POST' && pathname === '/api/settings/test') {
+    const body = await readBody(req);
+    if (!body.apiKey) return sendJSON(res, 400, { error: 'API key required.' });
+    const probe = JSON.parse(JSON.stringify(db));
+    probe.ai = { provider: body.provider || 'openrouter', apiKey: body.apiKey, model: body.model || 'openrouter/free' };
+    const t0 = Date.now();
+    const reply = await callExternalAI(probe, 'Reply with exactly: OK');
+    if (reply) return sendJSON(res, 200, { ok: true, latencyMs: Date.now() - t0, sample: reply.slice(0, 60) });
+    return sendJSON(res, 200, { ok: false, error: 'No response - check the key, model name and provider.' });
+  }
+
+  // GET /api/quiz -> questions for current goal (answers stripped)
+  if (method === 'GET' && pathname === '/api/quiz') {
+    if (!requireGoal(db, res)) return;
+    const qs = QUIZZES[db.goal] || [];
+    return sendJSON(res, 200, {
+      questions: qs.map((x, i) => ({ id: i, q: x.q, options: x.options })),
+      best: db.quizBest[db.goal] || null,
+      count: qs.length
+    });
+  }
+
+  // POST /api/quiz/submit {answers:[i,...]} -> graded results
+  if (method === 'POST' && pathname === '/api/quiz/submit') {
+    if (!requireGoal(db, res)) return;
+    const body = await readBody(req);
+    const qs = QUIZZES[db.goal] || [];
+    const answers = Array.isArray(body.answers) ? body.answers : [];
+    let score = 0;
+    const results = qs.map((x, i) => {
+      const yours = answers[i];
+      const right = yours === x.correct;
+      if (right) score++;
+      return { q: x.q, yourIndex: yours == null ? null : yours, correctIndex: x.correct, right, why: x.why };
+    });
+    const total = qs.length;
+    const prev = db.quizBest[db.goal];
+    if (!prev || score > prev.score) db.quizBest[db.goal] = { score, total, date: new Date().toISOString().slice(0, 10) };
+    saveDB(db);
+    return sendJSON(res, 200, { score, total, results, best: db.quizBest[db.goal] });
   }
 
   // GET /api/mentor (chat history)
