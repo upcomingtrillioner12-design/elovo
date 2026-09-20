@@ -2,15 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ELEVO — Your Skills. Real Opportunities.</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+
 <header id="topbar" class="topbar hidden">
-  <a href="#/dashboard" class="brand">ELEVO<span class="brand-dot">.</span></a>
+  <a href="#/home" class="brand">ELEVO<span class="brand-dot">.</span></a>
   <nav id="mainnav" class="mainnav">
-    <a href="#/dashboard" data-nav="dashboard">Dashboard</a>
+    <a href="#/home" data-nav="home">Home</a>
     <a href="#/roadmap" data-nav="roadmap">Roadmap</a>
     <a href="#/learn" data-nav="learn">Learn</a>
     <a href="#/practice" data-nav="practice">Practice</a>
@@ -18,14 +19,34 @@
     <a href="#/connect" data-nav="connect">Connect</a>
     <a href="#/opportunities" data-nav="opportunities">Opportunities</a>
     <a href="#/mentor" data-nav="mentor">AI Mentor</a>
+    <a href="#/settings" data-nav="settings">Settings</a>
   </nav>
-  <div class="topbar-right">
-    <span id="nav-goal" class="nav-goal"></span>
-    <button id="reset-btn" class="btn btn-small btn-ghost" title="Reset all progress">Reset</button>
-  </div>
 </header>
 
 <main id="app" class="app"></main>
+
+<!-- Android-style bottom navigation (mobile only) -->
+<nav id="bottombar" class="bottombar hidden">
+  <a href="#/home" data-nav="home"><span class="bnav-ico">&#8962;</span>Home</a>
+  <a href="#/learn" data-nav="learn"><span class="bnav-ico">&#9776;</span>Learn</a>
+  <a href="#/practice" data-nav="practice"><span class="bnav-ico">&#9874;</span>Practice</a>
+  <a href="#/portfolio" data-nav="portfolio"><span class="bnav-ico">&#9636;</span>Portfolio</a>
+  <a href="#/menu" data-nav="menu" id="menu-btn"><span class="bnav-ico">&#8801;</span>More</a>
+</nav>
+
+<!-- Floating AI Mentor button -->
+<a href="#/mentor" id="mentor-fab" class="mentor-fab hidden" title="AI Mentor">&#9993;</a>
+
+<!-- More sheet (mobile) -->
+<div id="sheet-backdrop" class="sheet-backdrop hidden"></div>
+<div id="more-sheet" class="more-sheet hidden">
+  <div class="sheet-handle"></div>
+  <a href="#/roadmap" class="sheet-item">&#8635; Roadmap</a>
+  <a href="#/connect" class="sheet-item">&#9733; Connect</a>
+  <a href="#/opportunities" class="sheet-item">&#9636; Opportunities</a>
+  <a href="#/mentor" class="sheet-item">&#9993; AI Mentor</a>
+  <a href="#/settings" class="sheet-item">&#9881; Settings</a>
+</div>
 
 <div id="toast" class="toast hidden"></div>
 <script src="/js/app.js"></script>
